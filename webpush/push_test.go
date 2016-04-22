@@ -34,7 +34,6 @@ func (transport *FakeTransport) RoundTrip(req *http.Request) (*http.Response, er
 }
 
 func TestSendWebPush(t *testing.T) {
-
 	// Test server checks that the request is well-formed
 	ts := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(200)
@@ -88,6 +87,45 @@ func TestSendWebPush(t *testing.T) {
 	}
 
 	_, err = Send(client, sub, message, "")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSendTickle(t *testing.T) {
+	// Test server checks that the request is well-formed
+	ts := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(200)
+
+		defer request.Body.Close()
+
+		body, err := ioutil.ReadAll(request.Body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if len(body) != 0 {
+			t.Errorf("Expected body to be length 0, was %d", len(body))
+		}
+	}))
+	defer ts.Close()
+
+	serverURL, _ := url.Parse(ts.URL)
+
+	// Make a fake transport that redirects all requests to the fake server
+	transport := &FakeTransport{serverURL}
+	client := &http.Client{Transport: transport}
+
+	subscriptionJSON := []byte(`{
+		"endpoint": "https://example.com/"
+	}`)
+
+	sub, err := SubscriptionFromJSON(subscriptionJSON)
+	if err != nil {
+		t.Error("Couldn't decode JSON subscription")
+	}
+
+	_, err = Send(client, sub, "", "")
 	if err != nil {
 		t.Error(err)
 	}
